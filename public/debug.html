@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - Chat Session Tracker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #00ff00;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 24px;
+        }
+
+        .panel {
+            background: #0a0a0a;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+        }
+
+        .panel h2 {
+            color: #ffff00;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            background: #1a1a1a;
+            margin-bottom: 8px;
+            border-left: 3px solid #00ff00;
+        }
+
+        .label {
+            color: #00ffff;
+            font-weight: bold;
+        }
+
+        .value {
+            color: #ffffff;
+            font-family: monospace;
+        }
+
+        .button {
+            background: #00ff00;
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .button:hover {
+            background: #00cc00;
+        }
+
+        .button:active {
+            background: #009900;
+        }
+
+        .log-container {
+            background: #0a0a0a;
+            border: 2px solid #00ff00;
+            padding: 15px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .log-entry {
+            padding: 5px;
+            border-bottom: 1px solid #003300;
+        }
+
+        .log-success {
+            color: #00ff00;
+        }
+
+        .log-error {
+            color: #ff0000;
+        }
+
+        .log-warning {
+            color: #ffff00;
+        }
+
+        .log-info {
+            color: #00ffff;
+        }
+
+        .timestamp {
+            color: #666;
+            font-size: 11px;
+            margin-right: 10px;
+        }
+
+        .sessions-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .session-card {
+            background: #1a1a1a;
+            border: 1px solid #00ff00;
+            padding: 15px;
+            border-radius: 4px;
+        }
+
+        .session-card.active {
+            border-color: #ffff00;
+            border-width: 3px;
+        }
+
+        .session-id {
+            color: #ffff00;
+            font-size: 11px;
+            word-break: break-all;
+            margin-bottom: 8px;
+        }
+
+        .session-title {
+            color: #00ffff;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .session-count {
+            color: #fff;
+            font-size: 12px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .status.connected {
+            background: #00ff00;
+            color: #000;
+        }
+
+        .status.disconnected {
+            background: #ff0000;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Chat Session Debug Monitor</h1>
+
+        <div class="panel">
+            <h2>System Status</h2>
+            <div class="info-row">
+                <span class="label">Redis:</span>
+                <span class="value" id="redis-status">
+                    <span class="status disconnected">Checking...</span>
+                </span>
+            </div>
+            <div class="info-row">
+                <span class="label">SQLite:</span>
+                <span class="value" id="sqlite-status">
+                    <span class="status disconnected">Checking...</span>
+                </span>
+            </div>
+            <div class="info-row">
+                <span class="label">Current Session (Redis):</span>
+                <span class="value" id="current-session">Loading...</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Frontend Session:</span>
+                <span class="value" id="frontend-session">None</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Total Chats:</span>
+                <span class="value" id="total-chats">0</span>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Controls</h2>
+            <div class="controls">
+                <button class="button" onclick="refreshStatus()">🔄 Refresh Status</button>
+                <button class="button" onclick="createNewChat()">➕ New Chat</button>
+                <button class="button" onclick="clearLogs()">🗑️ Clear Logs</button>
+                <button class="button" onclick="exportLogs()">💾 Export Logs</button>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>All Chat Sessions</h2>
+            <div class="sessions-list" id="sessions-list">
+                Loading...
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Activity Log</h2>
+            <div class="log-container" id="log-container"></div>
+        </div>
+    </div>
+
+    <script>
+        let logs = [];
+        const mainAppWindow = window.opener;
+
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = { timestamp, message, type };
+            logs.push(entry);
+
+            const logContainer = document.getElementById('log-container');
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry log-${type}`;
+            logEntry.innerHTML = `<span class="timestamp">[${timestamp}]</span>${message}`;
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        async function refreshStatus() {
+            addLog('🔄 Refreshing status...', 'info');
+
+            try {
+                // Check health
+                const healthResponse = await fetch('/health');
+                const health = await healthResponse.json();
+
+                // Update Redis status
+                const redisStatus = document.getElementById('redis-status');
+                if (health.services.redis === 'connected') {
+                    redisStatus.innerHTML = '<span class="status connected">Connected</span>';
+                    addLog('✅ Redis connected', 'success');
+                } else {
+                    redisStatus.innerHTML = '<span class="status disconnected">Disconnected</span>';
+                    addLog('❌ Redis disconnected', 'error');
+                }
+
+                // Update SQLite status
+                const sqliteStatus = document.getElementById('sqlite-status');
+                if (health.services.sqlite === 'connected') {
+                    sqliteStatus.innerHTML = '<span class="status connected">Connected</span>';
+                    addLog('✅ SQLite connected', 'success');
+                } else {
+                    sqliteStatus.innerHTML = '<span class="status disconnected">Disconnected</span>';
+                    addLog('❌ SQLite disconnected', 'error');
+                }
+
+                // Update total chats
+                document.getElementById('total-chats').textContent = health.services.total_chats || 0;
+
+                // Get current session (we'll need to add this to health endpoint or create new one)
+                // For now, show if we have access to main window
+                if (mainAppWindow && mainAppWindow.currentChatId) {
+                    document.getElementById('frontend-session').textContent = mainAppWindow.currentChatId || 'None';
+                    addLog(`📍 Frontend session: ${mainAppWindow.currentChatId}`, 'info');
+                }
+
+                // Load all sessions
+                await loadSessions();
+
+            } catch (err) {
+                addLog(`❌ Error checking status: ${err.message}`, 'error');
+            }
+        }
+
+        async function loadSessions() {
+            try {
+                const response = await fetch('/chat-history');
+                const sessions = await response.json();
+
+                const sessionsList = document.getElementById('sessions-list');
+                sessionsList.innerHTML = '';
+
+                if (sessions.length === 0) {
+                    sessionsList.innerHTML = '<div style="color: #666; text-align: center; padding: 20px;">No sessions found</div>';
+                    return;
+                }
+
+                const currentSession = mainAppWindow?.currentChatId;
+
+                sessions.forEach(session => {
+                    const card = document.createElement('div');
+                    card.className = 'session-card';
+                    if (session.session_id === currentSession) {
+                        card.classList.add('active');
+                    }
+
+                    card.innerHTML = `
+                        <div class="session-title">${session.title || 'Untitled'}</div>
+                        <div class="session-id">${session.session_id}</div>
+                        <button class="button" onclick="switchToSession('${session.session_id}')">
+                            Switch to This
+                        </button>
+                    `;
+
+                    sessionsList.appendChild(card);
+                });
+
+                addLog(`📊 Loaded ${sessions.length} sessions`, 'success');
+            } catch (err) {
+                addLog(`❌ Error loading sessions: ${err.message}`, 'error');
+            }
+        }
+
+        async function createNewChat() {
+            try {
+                addLog('➕ Creating new chat...', 'info');
+                const response = await fetch('/reset', { method: 'POST' });
+                const data = await response.json();
+                addLog(`✅ New chat created: ${data.sessionId}`, 'success');
+
+                if (mainAppWindow) {
+                    mainAppWindow.location.reload();
+                }
+
+                setTimeout(refreshStatus, 1000);
+            } catch (err) {
+                addLog(`❌ Error creating new chat: ${err.message}`, 'error');
+            }
+        }
+
+        async function switchToSession(sessionId) {
+            try {
+                addLog(`🔄 Switching to session: ${sessionId}`, 'info');
+
+                const response = await fetch('/switch-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId })
+                });
+
+                const data = await response.json();
+                addLog(`✅ Switched to session: ${data.sessionId}`, 'success');
+
+                if (mainAppWindow && mainAppWindow.loadChat) {
+                    mainAppWindow.loadChat(sessionId);
+                }
+
+                setTimeout(refreshStatus, 500);
+            } catch (err) {
+                addLog(`❌ Error switching session: ${err.message}`, 'error');
+            }
+        }
+
+        function clearLogs() {
+            logs = [];
+            document.getElementById('log-container').innerHTML = '';
+            addLog('🗑️ Logs cleared', 'info');
+        }
+
+        function exportLogs() {
+            const logText = logs.map(log => `[${log.timestamp}] [${log.type.toUpperCase()}] ${log.message}`).join('\n');
+            const blob = new Blob([logText], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `chat-debug-${Date.now()}.log`;
+            a.click();
+            URL.revokeObjectURL(url);
+            addLog('💾 Logs exported', 'success');
+        }
+
+        // Auto-refresh every 5 seconds
+        setInterval(refreshStatus, 5000);
+
+        // Initial load
+        addLog('🚀 Debug monitor started', 'success');
+        refreshStatus();
+    </script>
+</body>
+</html>

@@ -7,12 +7,27 @@ import dotenv from "dotenv";
 import { createClient } from "redis";
 import sqlite3 from "sqlite3";
 import natural from "natural";
+import session from "express-session";
+import bcrypt from "bcryptjs";
 const { WordTokenizer } = natural;
 
 dotenv.config();
 
 const app = express();
 app.use(express.json());
+
+// Session configuration
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'bedrock-chatbot-secret-key-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: false, // Set to true if using HTTPS
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
+
 app.use(express.static("public"));
 
 // Redis client
@@ -74,6 +89,42 @@ db.serialize(() => {
       console.log("✅ Database indexes ready");
     }
   });
+
+  // Create users table
+  db.run(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `, (err) => {
+    if (err) {
+      console.error("❌ Error creating users table:", err);
+    } else {
+      console.log("✅ users table ready");
+
+      // Seed the default user
+      db.get("SELECT id FROM users WHERE email = ?", ["katakgendong@gmail.com"], (err, row) => {
+        if (!row) {
+          const hashedPassword = bcrypt.hashSync("admin123", 10);
+          db.run(
+            "INSERT INTO users (email, password) VALUES (?, ?)",
+            ["katakgendong@gmail.com", hashedPassword],
+            (err) => {
+              if (err) {
+                console.error("❌ Error seeding user:", err);
+              } else {
+                console.log("✅ Default user seeded (katakgendong@gmail.com)");
+              }
+            }
+          );
+        } else {
+          console.log("✅ Default user already exists");
+        }
+      });
+    }
+  });
 });
 
 const client = new BedrockAgentRuntimeClient({
@@ -113,15 +164,76 @@ const generateTitle = (message) => {
 // Store active streams for stop functionality
 const activeStreams = new Map();
 
+// Authentication middleware
+const requireAuth = (req, res, next) => {
+  if (req.session.userId) {
+    next();
+  } else {
+    res.status(401).json({ error: "Unauthorized" });
+  }
+};
+
+// Login endpoint
+app.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    res.status(400).json({ error: "Email and password are required" });
+    return;
+  }
+
+  db.get("SELECT * FROM users WHERE email = ?", [email], async (err, user) => {
+    if (err) {
+      res.status(500).json({ error: "Database error" });
+      return;
+    }
+
+    if (!user) {
+      res.status(401).json({ error: "Invalid email or password" });
+      return;
+    }
+
+    const passwordMatch = await bcrypt.compare(password, user.password);
+    if (!passwordMatch) {
+      res.status(401).json({ error: "Invalid email or password" });
+      return;
+    }
+
+    req.session.userId = user.id;
+    req.session.email = user.email;
+    res.json({ message: "Login successful", email: user.email });
+  });
+});
+
+// Logout endpoint
+app.post("/logout", (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      res.status(500).json({ error: "Could not logout" });
+    } else {
+      res.json({ message: "Logout successful" });
+    }
+  });
+});
+
+// Check authentication status
+app.get("/auth/check", (req, res) => {
+  if (req.session.userId) {
+    res.json({ authenticated: true, email: req.session.email });
+  } else {
+    res.json({ authenticated: false });
+  }
+});
+
 // Reset session
-app.post("/reset", async (req, res) => {
+app.post("/reset", requireAuth, async (req, res) => {
   const newSessionId = "single-user-session-" + Date.now();
   await redisClient.set("currentSessionId", newSessionId);
   res.json({ message: "Session reset", sessionId: newSessionId });
 });
 
 // Switch to existing session
-app.post("/switch-session", async (req, res) => {
+app.post("/switch-session", requireAuth, async (req, res) => {
   const { sessionId } = req.body;
   if (!sessionId) {
     res.status(400).json({ error: "Session ID is required" });
@@ -137,7 +249,7 @@ app.post("/switch-session", async (req, res) => {
 });
 
 // Delete chat
-app.delete("/chat-history/:sessionId", async (req, res) => {
+app.delete("/chat-history/:sessionId", requireAuth, async (req, res) => {
   const { sessionId } = req.params;
   try {
     await new Promise((resolve, reject) => {
@@ -159,7 +271,7 @@ app.delete("/chat-history/:sessionId", async (req, res) => {
 });
 
 // Rename chat
-app.put("/chat-history/:sessionId", async (req, res) => {
+app.put("/chat-history/:sessionId", requireAuth, async (req, res) => {
   const { sessionId } = req.params;
   const { title } = req.body;
   try {
@@ -176,7 +288,7 @@ app.put("/chat-history/:sessionId", async (req, res) => {
 });
 
 // Stop generation
-app.post("/stop-generation/:streamId", (req, res) => {
+app.post("/stop-generation/:streamId", requireAuth, (req, res) => {
   const { streamId } = req.params;
   const stream = activeStreams.get(streamId);
   if (stream) {
@@ -189,7 +301,7 @@ app.post("/stop-generation/:streamId", (req, res) => {
 });
 
 // Streaming chat via SSE
-app.get("/chat-stream", async (req, res) => {
+app.get("/chat-stream", requireAuth, async (req, res) => {
   const message = req.query.message;
   const streamId = req.query.streamId || Date.now().toString();
 
@@ -295,7 +407,7 @@ app.get("/chat-stream", async (req, res) => {
 });
 
 // Cost monitor page
-app.get("/cost-monitor", (req, res) => {
+app.get("/cost-monitor", requireAuth, (req, res) => {
   db.all("SELECT * FROM token_usage", (err, rows) => {
     if (err) {
       res.status(500).send(err.message);
@@ -306,7 +418,7 @@ app.get("/cost-monitor", (req, res) => {
 });
 
 // Chat history page
-app.get("/chat-history", (req, res) => {
+app.get("/chat-history", requireAuth, (req, res) => {
   const sessionId = req.query.session_id;
   const search = req.query.search;
 

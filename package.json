@@ -1,10 +1,10 @@
 {
   "name": "bedrock-chatbot",
   "version": "1.0.0",
-  "description": "",
-  "main": "server.js",
+  "description": "AI Chatbot with AWS Bedrock",
   "scripts": {
     "start": "node server.js",
+    "build": "echo 'Static site - no build needed'",
     "fix-titles": "node fix-titles.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

@@ -1,0 +1,21 @@
+# Local development files
+.env
+.env.local
+*.db
+*.log
+
+# Node modules (Vercel installs dependencies)
+node_modules/
+
+# Development scripts (not needed in production)
+server.js
+fix-titles.js
+test-setup.sh
+
+# Documentation
+*.md
+!README.md
+
+# Git
+.git/
+.gitignore

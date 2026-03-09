@@ -2,6 +2,22 @@
 
 A full-featured AI chatbot built with AWS Bedrock, featuring a modern ChatGPT-like interface with streaming responses, conversation management, and advanced UI features.
 
+## 🚀 Quick Deploy
+
+### Option 1: Deploy to Vercel (Production)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/yourusername/bedrock-chatbot)
+
+**5-minute setup:** See [QUICK_START_VERCEL.md](./QUICK_START_VERCEL.md)
+
+### Option 2: Run Locally (Development)
+```bash
+npm install
+npm start
+# Open http://localhost:3000
+```
+
+**Full guide:** Continue reading below
+
 ## Features
 
 ### Core Chat Features
@@ -45,7 +61,31 @@ A full-featured AI chatbot built with AWS Bedrock, featuring a modern ChatGPT-li
 - **Session History** - View all past conversations
 - **Usage Statistics** - Total tokens and requests
 
-## Installation
+## Deployment Options
+
+This chatbot can be deployed in two ways:
+
+### 🌐 Cloud Deployment (Vercel)
+- **Best for:** Production, public access, auto-scaling
+- **Setup time:** 5 minutes
+- **Cost:** Free tier available
+- **Guide:** [QUICK_START_VERCEL.md](./QUICK_START_VERCEL.md)
+
+```bash
+./deploy-vercel.sh
+```
+
+### 💻 Local Development
+- **Best for:** Development, testing, learning
+- **Setup time:** 5 minutes
+- **Cost:** Free
+- **Guide:** Continue below
+
+**Compare options:** See [DEPLOYMENT_OPTIONS.md](./DEPLOYMENT_OPTIONS.md)
+
+---
+
+## Local Installation
 
 ### Prerequisites
 - Node.js (v16 or higher)
@@ -67,6 +107,8 @@ npm install
 3. Configure environment variables in `.env`:
 ```
 AWS_REGION=ap-southeast-1
+AWS_ACCESS_KEY_ID=your-access-key
+AWS_SECRET_ACCESS_KEY=your-secret-key
 AGENT_ID=your-agent-id
 AGENT_ALIAS_ID=your-agent-alias-id
 ```
@@ -78,7 +120,7 @@ redis-server
 
 5. Run the application:
 ```bash
-node server.js
+npm start
 ```
 
 6. Open your browser:

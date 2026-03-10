@@ -703,10 +703,6 @@
                 <i class="fas fa-chart-line"></i>
                 Cost Monitor
             </button>
-            <button class="sidebar-button" id="logout-button">
-                <i class="fas fa-sign-out-alt"></i>
-                Logout
-            </button>
         </div>
     </div>
 
@@ -794,18 +790,6 @@
     </div>
 
     <script>
-        // Check authentication
-        fetch('/auth/check')
-            .then(res => res.json())
-            .then(data => {
-                if (!data.authenticated) {
-                    window.location.href = '/login.html';
-                }
-            })
-            .catch(() => {
-                window.location.href = '/login.html';
-            });
-
         // DOM Elements
         const chatHistory = document.getElementById('chat-history');
         const inputMessage = document.getElementById('input-message');
@@ -820,7 +804,6 @@
         const shortcutsButton = document.getElementById('shortcuts-button');
         const scrollToBottomBtn = document.getElementById('scroll-to-bottom');
         const costMonitorButton = document.getElementById('cost-monitor-button');
-        const logoutButton = document.getElementById('logout-button');
 
         // State
         let currentChatId = null;
@@ -1630,27 +1613,6 @@
             } catch (err) {
                 console.error('Failed to load cost monitor:', err);
                 alert('Failed to load cost monitor');
-            }
-        });
-
-        // Logout
-        logoutButton.addEventListener('click', async () => {
-            try {
-                const response = await fetch('/logout', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-
-                if (response.ok) {
-                    window.location.href = '/login.html';
-                } else {
-                    alert('Logout failed. Please try again.');
-                }
-            } catch (err) {
-                console.error('Logout error:', err);
-                alert('Logout failed. Please try again.');
             }
         });
 
